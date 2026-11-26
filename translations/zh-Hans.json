@@ -1,0 +1,123 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "选择 AI 服务",
+        "description": "选择服务商并填写 API 密钥。模型列表会自动从该服务获取。",
+        "data": {
+          "provider": "服务商",
+          "base_url": "自定义 API 地址（仅“自定义”时填写）",
+          "api_key": "API 密钥",
+          "name": "名称（可选）",
+          "use_doubao": "使用豆包语音识别",
+          "doubao_api_key": "豆包语音 API Key"
+        }
+      },
+      "models": {
+        "title": "选择模型",
+        "description": "模型来自所有已添加的提供商（下拉选项带“提供商 · 模型”前缀），可直接为每类模型挑选不同提供商的模型。某类没有合适模型时，可选「（使用其它提供商配置）」再添加提供商。",
+        "data": {
+          "llm_model": "对话模型",
+          "task_model": "AI 任务模型（默认同对话模型）",
+          "image_model": "图片生成模型（可选）",
+          "stt_model": "语音转文本模型（可选）",
+          "tts_model": "文本转语音模型（可选）",
+          "prompt": "对话提示词"
+        }
+      },
+      "add_providers": {
+        "title": "添加提供商（可选）",
+        "description": "已添加：{providers}。需要更多模型时可在这一步添加其它提供商（支持为不同模型选用不同提供商）。",
+        "data": {
+          "add_more": "添加另一个提供商"
+        }
+      },
+      "add_provider": {
+        "title": "添加提供商",
+        "data": {
+          "provider": "服务商",
+          "api_key": "API 密钥",
+          "name": "名称（可选）",
+          "base_url": "自定义 API 地址（仅“自定义”时填写）"
+        }
+      },
+      "extra_models": {
+        "title": "选择模型",
+        "description": "来自 {provider}：请为 {missing} 选择模型。",
+        "data": {
+          "llm": "对话模型",
+          "task": "AI 任务模型",
+          "image": "图片生成模型",
+          "stt": "语音转文本模型",
+          "tts": "文本转语音模型"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "API 密钥无效",
+      "cannot_connect": "无法连接到该 API 服务",
+      "need_base_url": "选择“自定义”时必须填写 API 地址",
+      "need_doubao_key": "选择豆包 SeedASR 时必须填写豆包语音 API Key",
+      "already_added": "该提供商已添加"
+    },
+    "abort": {
+      "already_configured": "该服务已配置过"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "修改模型设置",
+        "description": "每个模型都可以选择不同提供商的模型（下拉里带提供商名前缀）；修改后会自动重新加载。",
+        "data": {
+          "llm_model": "对话模型",
+          "task_model": "AI 任务模型（默认同对话模型）",
+          "image_model": "图片生成模型（可选）",
+          "stt_model": "语音转文本模型（可选）",
+          "tts_model": "文本转语音模型（可选）",
+          "prompt": "对话提示词"
+        }
+      },
+      "add_provider": {
+        "title": "添加提供商",
+        "data": {
+          "provider": "服务商",
+          "api_key": "API 密钥",
+          "name": "名称（可选）",
+          "base_url": "自定义 API 地址（仅“自定义”时填写）"
+        }
+      },
+      "extra_models": {
+        "title": "选择模型",
+        "description": "来自 {provider}：请为 {missing} 选择模型。",
+        "data": {
+          "llm": "对话模型",
+          "task": "AI 任务模型",
+          "image": "图片生成模型",
+          "stt": "语音转文本模型",
+          "tts": "文本转语音模型"
+        }
+      }
+    },
+    "error": {
+      "already_added": "该提供商已添加"
+    }
+  },
+  "entity": {
+    "conversation": {
+      "agent": {
+        "name": "AI 对话"
+      }
+    },
+    "stt": {
+      "speech_recognition": {
+        "name": "语音识别"
+      }
+    },
+    "ai_task": {
+      "ai_task": {
+        "name": "AI 任务"
+      }
+    }
+  }
+}
