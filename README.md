@@ -40,15 +40,10 @@
 
 - **为语音场景优化**
   - 内置语音助手提示词（回答简短、口语化、不读代码/实体 ID）
-  - 小米 MiMo 自动关闭深度思考（大幅降低响应延迟）
   - 对话被打断时不会把错误文本读出来
   - 空音频（静音）友好处理
 
-- **品牌图 + 设备聚合**
-  - 四个平台共享一个设备，实体归组清晰
-  - 自带 icon / logo / 深色品牌图
 
----
 
 ## 📦 安装
 
@@ -121,9 +116,11 @@
 
 ---
 
-## 🖼️ 截图 / 品牌
-
-集成自带品牌图（`brand/`），在集成页面显示。
+## 🖼️ 截图 
+<img width="697" height="865" alt="image" src="https://github.com/user-attachments/assets/28d8cd6d-7fdc-4def-9b63-f9a512ed1069" />
+<img width="584" height="819" alt="image" src="https://github.com/user-attachments/assets/8cc00ff6-fb19-4546-95c8-90e7856326cc" />
+<img width="580" height="422" alt="image" src="https://github.com/user-attachments/assets/890be70e-1887-4867-8a37-f1047e27e28c" />
+<img width="773" height="450" alt="image" src="https://github.com/user-attachments/assets/d95895e9-1460-43b6-9c18-e44529e80429" />
 
 ---
 
