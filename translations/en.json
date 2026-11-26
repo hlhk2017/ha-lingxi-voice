@@ -1,0 +1,123 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Choose AI service",
+        "description": "Pick a provider and enter your API key. Models are fetched automatically.",
+        "data": {
+          "provider": "Provider",
+          "base_url": "Custom API base URL (only for Custom)",
+          "api_key": "API key",
+          "name": "Name (optional)",
+          "use_doubao": "Use Doubao voice recognition",
+          "doubao_api_key": "Doubao Voice API key"
+        }
+      },
+      "models": {
+        "title": "Choose models",
+        "description": "Models come from every added provider (labels are prefixed). You can pick a different provider for each capability. Use “（使用其它提供商配置）” to add another provider when none fits.",
+        "data": {
+          "llm_model": "Chat model",
+          "task_model": "AI task model (defaults to chat)",
+          "image_model": "Image generation model (optional)",
+          "stt_model": "Speech-to-text model (optional)",
+          "tts_model": "Text-to-speech model (optional)",
+          "prompt": "Prompt"
+        }
+      },
+      "add_providers": {
+        "title": "Add providers (optional)",
+        "description": "Added: {providers}. Add more providers here if you need their models.",
+        "data": {
+          "add_more": "Add another provider"
+        }
+      },
+      "add_provider": {
+        "title": "Add provider",
+        "data": {
+          "provider": "Provider",
+          "api_key": "API key",
+          "name": "Name (optional)",
+          "base_url": "Custom API base URL (only for Custom)"
+        }
+      },
+      "extra_models": {
+        "title": "Select models",
+        "description": "From {provider}: choose a model for {missing}.",
+        "data": {
+          "llm": "Chat model",
+          "task": "AI task model",
+          "image": "Image generation model",
+          "stt": "Speech-to-text model",
+          "tts": "Text-to-speech model"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key",
+      "cannot_connect": "Cannot connect to the API service",
+      "need_base_url": "API base URL is required for Custom providers",
+      "need_doubao_key": "Doubao Voice API key is required for SeedASR",
+      "already_added": "This provider is already added"
+    },
+    "abort": {
+      "already_configured": "This service is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edit model settings",
+        "description": "Each model can come from a different provider (dropdown labels are prefixed with the provider).",
+        "data": {
+          "llm_model": "Chat model",
+          "task_model": "AI task model (defaults to chat)",
+          "image_model": "Image generation model (optional)",
+          "stt_model": "Speech-to-text model (optional)",
+          "tts_model": "Text-to-speech model (optional)",
+          "prompt": "Prompt"
+        }
+      },
+      "add_provider": {
+        "title": "Add provider",
+        "data": {
+          "provider": "Provider",
+          "api_key": "API key",
+          "name": "Name (optional)",
+          "base_url": "Custom API base URL (only for Custom)"
+        }
+      },
+      "extra_models": {
+        "title": "Select models",
+        "description": "From {provider}: choose a model for {missing}.",
+        "data": {
+          "llm": "Chat model",
+          "task": "AI task model",
+          "image": "Image generation model",
+          "stt": "Speech-to-text model",
+          "tts": "Text-to-speech model"
+        }
+      }
+    },
+    "error": {
+      "already_added": "This provider is already added"
+    }
+  },
+  "entity": {
+    "conversation": {
+      "agent": {
+        "name": "AI conversation"
+      }
+    },
+    "stt": {
+      "speech_recognition": {
+        "name": "Speech recognition"
+      }
+    },
+    "ai_task": {
+      "ai_task": {
+        "name": "AI task"
+      }
+    }
+  }
+}
