@@ -52,15 +52,29 @@
 
 ## 📦 安装
 
-### 方式一：HACS 自定义仓库（推荐）
+> **版本差异**：从 **Home Assistant 2026.11** 开始，社区商店 **HACS 已内置为 Marketplace（市场）**，
+> 不需要再单独安装 HACS；**2026.10 及更早版本**仍然使用 HACS。
+> 本集成同时兼容两者（仓库里带 `hacs.json`，Marketplace 与 HACS 都能识别）。
 
-1. HACS → 集成 → 右上角 ⋮ → 自定义存储库
-2. 添加本仓库 URL，类别选「集成」
-3. 搜索「灵犀语音」安装并重启 Home Assistant
+### 方式一：Home Assistant 2026.11 及更新版本（内置 Marketplace）
 
-### 方式二：手动安装
+1. 打开 **设置 → 市场（Marketplace）**
+2. 添加**自定义仓库（Custom repository）**，填入：
+   `https://github.com/hlhk2017/ha-lingxi-voice`
+   （类别选择「集成 / Integration」；如需登录 GitHub，用你自己的账号授权即可）
+3. 在 Marketplace 中搜索 **灵犀语音** 并安装
+4. 安装后按提示重启 Home Assistant（新版本通常支持安装后直接启用）
 
-把 `custom_components/ai_voice` 整个目录复制到你的 Home Assistant 配置目录：
+### 方式二：Home Assistant 2026.10 及更早版本（HACS）
+
+1. 确保已安装 HACS（旧版本需要单独安装）
+2. **HACS → 集成 → 右上角 ⋮ → 自定义存储库**
+3. 添加 `https://github.com/hlhk2017/ha-lingxi-voice`，类别选「集成」
+4. 在 HACS 中搜索 **灵犀语音** → 下载 → 重启 Home Assistant
+
+### 方式三：手动安装（任意版本）
+
+把 `custom_components/ai_voice` 整个目录复制到 Home Assistant 配置目录：
 
 ```
 /config/custom_components/ai_voice/
