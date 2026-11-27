@@ -33,11 +33,6 @@
   - 火山引擎 方舟（Ark）、**豆包语音（SeedASR）**、**小米 MiMo**
   - 自定义服务（填 base_url 即可）
 
-- **不只是 OpenAI 兼容（语音侧）**
-  - 语音识别：OpenAI 兼容 `/audio/transcriptions`、豆包 SeedASR（录音文件识别协议）、小米 MiMo ASR（`chat/completions + input_audio`）
-  - 语音合成：OpenAI 兼容 `/audio/speech`、小米 MiMo TTS（9 种预置音色）
-  - 图像生成：OpenAI 兼容 `/images/generations`，自动适配华为云 MaaS 的生图地址
-
 - **生成控制（1.2+）**
   - 流式响应（OpenAI SSE / Anthropic SSE / Ollama NDJSON），失败自动回退非流式
   - 温度、最大输出 token、历史消息条数可配（对话与 AI Task 分开）
@@ -63,11 +58,6 @@
   - 模型/提示词在设置页改完即热更新，实体自动重建
   - 支持同一集成内随时切换模型来源
 
-- **为语音场景优化**
-  - 内置语音助手提示词（回答简短、口语化、不读代码/实体 ID）
-  - 对话被打断时不会把错误文本读出来
-  - 空音频（静音）友好处理
-  - 被剥离成空回答时自动补一句「好的。」，避免静音
 
 ---
 
@@ -80,11 +70,11 @@
 ### 方式一：Home Assistant 2026.11 及更新版本（内置 Marketplace）
 
 1. 打开 **设置 → 市场（Marketplace）**
-2. 添加**自定义仓库（Custom repository）**，填入：
+2. 点击**从链接添加**，填入：
    `https://github.com/hlhk2017/ha-lingxi-voice`
-   （类别选择「集成 / Integration」；如需登录 GitHub，用你自己的账号授权即可）
+   需登录 GitHub，用你自己的账号授权即可
 3. 在 Marketplace 中搜索 **灵犀语音** 并安装
-4. 安装后按提示重启 Home Assistant（新版本通常支持安装后直接启用）
+4. 安装后自动出配置界面（没有就重启后添加集成搜索）
 
 ### 方式二：Home Assistant 2026.10 及更早版本（HACS）
 
