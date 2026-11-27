@@ -84,6 +84,9 @@ CONF_MAX_TOKENS = "max_tokens"
 
 # 常见 OpenAI 兼容提供商（选择后自动填充 base_url，也可选“自定义”手动填）
 PROVIDERS: dict[str, str] = {
+    "Anthropic Claude": "https://api.anthropic.com",
+    "Ollama（本地，需填宿主机地址）": "http://localhost:11434",
+    "Ollama Cloud": "https://ollama.com",
     "硅基流动 SiliconFlow": "https://api.siliconflow.cn/v1",
     "DeepSeek 深度求索": "https://api.deepseek.com/v1",
     "阿里云百炼 DashScope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -107,11 +110,16 @@ DOUBAO_PROVIDER_LABEL = "豆包语音（火山）"
 PROVIDER_KINDS: dict[str, str] = {
     "豆包语音（火山）": "doubao",
     "小米 MiMo": "mimo",
+    "Anthropic Claude": "anthropic",
+    "Ollama（本地，需填宿主机地址）": "ollama",
+    "Ollama Cloud": "ollama",
 }
 PROVIDER_KIND_LABELS: dict[str, str] = {
     "openai": "OpenAI 兼容",
     "doubao": "豆包 SeedASR",
     "mimo": "小米 MiMo",
+    "anthropic": "Anthropic 兼容",
+    "ollama": "Ollama 原生",
 }
 
 # UI 下拉用 {url: 中文名}，这样界面显示中文名、提交的是 URL
@@ -278,3 +286,94 @@ def provider_label(provider_or_url: str | None) -> str:
 def short_model_name(model_id: str | None) -> str:
     """Return the part after the last slash, for compact entity names."""
     return (model_id or "").split("/")[-1] or "未设置"
+
+
+# ======================================================================
+# v1.2.0 高级设置（对标 Local OpenAI LLM 的能力）
+# ======================================================================
+
+CONF_PROTOCOL = "protocol"
+CONF_SERVER_TYPE = "server_type"
+CONF_HISTORY_MAX = "history_max_messages"
+CONF_STRIP_THINK = "strip_think"
+CONF_STRIP_EMOJI = "strip_emoji"
+CONF_STREAM = "stream"
+CONF_PARALLEL_TOOL_CALLS = "parallel_tool_calls"
+CONF_MAX_TOOL_ITERATIONS = "max_tool_iterations"
+CONF_CHAT_TEMPLATE_ARGS = "chat_template_args"
+CONF_REQUEST_BODY_PARAMS = "request_body_params"
+CONF_CUSTOM_HEADERS = "custom_headers"
+CONF_CONTEXT_TEMPLATE = "context_injection_template"
+CONF_CONTEXT_ROLE = "context_injection_role"
+
+# 推理服务端专项
+CONF_THINKING_MODE = "thinking_mode"
+CONF_REASONING_EFFORT = "reasoning_effort"
+CONF_THINKING_TOKEN_BUDGET = "thinking_token_budget"
+CONF_INCLUDE_PRIOR_THINKING = "include_prior_thinking"
+CONF_SLOT_ID = "slot_id"
+CONF_USE_LOADED_MODEL = "use_loaded_model"
+CONF_TOP_P = "top_p"
+CONF_MIN_P = "min_p"
+CONF_TOP_K = "top_k"
+CONF_REPEAT_PENALTY = "repeat_penalty"
+CONF_PRESENCE_PENALTY = "presence_penalty"
+
+# AI Task 专用采样
+CONF_TASK_TEMPERATURE = "task_temperature"
+CONF_TASK_MAX_TOKENS = "task_max_tokens"
+
+DEFAULT_HISTORY_MAX = 24
+DEFAULT_STRIP_THINK = True
+DEFAULT_STRIP_EMOJI = False
+DEFAULT_STREAM = False
+DEFAULT_PARALLEL_TOOL_CALLS = False
+DEFAULT_MAX_TOOL_ITERATIONS = 4
+DEFAULT_TASK_MAX_TOKENS = 800
+DEFAULT_CONTEXT_ROLE = "system"
+DEFAULT_CONTEXT_TEMPLATE = (
+    "{% set t = now() %}当前时间是 {{ t.strftime('%Y年%m月%d日 %H:%M') }}（{{ "
+    "'一二三四五六日'[t.weekday()] }}）。"
+)
+DEFAULT_TOP_P = 1.0
+DEFAULT_MIN_P = 0.0
+DEFAULT_TOP_K = 0
+DEFAULT_REPEAT_PENALTY = 1.0
+DEFAULT_PRESENCE_PENALTY = 0.0
+
+PROTOCOL_OPTIONS: dict[str, str] = {
+    "auto": "自动识别（按服务商/地址）",
+    "openai": "OpenAI 兼容（/chat/completions）",
+    "anthropic": "Anthropic 兼容（/v1/messages）",
+    "ollama": "Ollama 原生（/api/chat）",
+}
+
+# server_type → 中文名
+SERVER_TYPES: dict[str, str] = {
+    "generic": "通用 OpenAI 兼容",
+    "deepseek": "DeepSeek Cloud",
+    "llama_cpp": "llama.cpp",
+    "vllm": "vLLM",
+    "localai": "LocalAI",
+    "ollama": "Ollama",
+}
+SERVER_TYPE_OPTIONS: dict[str, str] = {k: v for k, v in SERVER_TYPES.items()}
+
+THINKING_MODES: dict[str, str] = {
+    "none": "（不干预）",
+    "always": "始终思考",
+    "first_iteration": "仅首轮思考",
+}
+REASONING_EFFORTS: dict[str, str] = {
+    "high": "High（标准）",
+    "max": "Max（最大）",
+}
+CONTEXT_ROLES: dict[str, str] = {
+    "system": "System（推荐）",
+    "tool": "Tool Result",
+    "assistant": "Assistant",
+    "user": "User",
+    "none": "禁用",
+}
+
+EVENT_GENERATION_COMPLETE = "ai_voice_generation_complete"

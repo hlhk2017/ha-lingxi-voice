@@ -25,7 +25,9 @@ def _platforms_for(entry: ConfigEntry) -> list[Platform]:
     """Return the platforms enabled by this entry."""
     platforms = list(PLATFORMS)
     stt = resolve_target(entry, "stt")
-    if not stt["model"] and stt["kind"] != "doubao":
+    if stt["kind"] not in ("openai", "doubao", "mimo"):
+        platforms.remove(Platform.STT)
+    elif not stt["model"] and stt["kind"] != "doubao":
         platforms.remove(Platform.STT)
     tts = resolve_target(entry, "tts")
     if not (tts["kind"] in ("mimo", "openai") and tts["model"]):

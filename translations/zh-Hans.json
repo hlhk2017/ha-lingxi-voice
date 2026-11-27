@@ -10,7 +10,8 @@
           "api_key": "API 密钥",
           "name": "名称（可选）",
           "use_doubao": "使用豆包语音识别",
-          "doubao_api_key": "豆包语音 API Key"
+          "doubao_api_key": "豆包语音 API Key",
+          "protocol": "协议（自动识别 / OpenAI / Anthropic / Ollama）"
         }
       },
       "models": {
@@ -38,7 +39,8 @@
           "provider": "服务商",
           "api_key": "API 密钥",
           "name": "名称（可选）",
-          "base_url": "自定义 API 地址（仅“自定义”时填写）"
+          "base_url": "自定义 API 地址（仅“自定义”时填写）",
+          "protocol": "协议（自动识别 / OpenAI / Anthropic / Ollama）"
         }
       },
       "extra_models": {
@@ -75,7 +77,8 @@
           "image_model": "图片生成模型（可选）",
           "stt_model": "语音转文本模型（可选）",
           "tts_model": "文本转语音模型（可选）",
-          "prompt": "对话提示词"
+          "prompt": "对话提示词",
+          "configure_advanced": "配置高级参数"
         }
       },
       "add_provider": {
@@ -84,7 +87,8 @@
           "provider": "服务商",
           "api_key": "API 密钥",
           "name": "名称（可选）",
-          "base_url": "自定义 API 地址（仅“自定义”时填写）"
+          "base_url": "自定义 API 地址（仅“自定义”时填写）",
+          "protocol": "协议（自动识别 / OpenAI / Anthropic / Ollama）"
         }
       },
       "extra_models": {
@@ -97,10 +101,43 @@
           "stt": "语音转文本模型",
           "tts": "文本转语音模型"
         }
+      },
+      "advanced": {
+        "title": "高级参数",
+        "description": "这些参数作用于对话与 AI 任务。JSON 类字段支持 Jinja2 模板（如 conversation_id 变量），留空表示不使用；也可用 k=v 每行一个。",
+        "data": {
+          "server_type": "服务端类型（决定可用的推理参数）",
+          "temperature": "对话温度",
+          "max_tokens": "对话最大输出 token",
+          "task_temperature": "AI 任务温度",
+          "task_max_tokens": "AI 任务最大输出 token",
+          "history_max_messages": "保留历史消息条数",
+          "strip_think": "剥离思考标签（think 标签）",
+          "strip_emoji": "剥离 emoji",
+          "stream": "流式响应",
+          "parallel_tool_calls": "并行工具调用",
+          "max_tool_iterations": "工具调用最大轮数",
+          "context_injection_template": "上下文注入模板（Jinja2）",
+          "context_injection_role": "上下文注入角色",
+          "thinking_mode": "思考模式",
+          "reasoning_effort": "推理强度（DeepSeek）",
+          "thinking_token_budget": "思考 token 预算（vLLM，留空不限制）",
+          "include_prior_thinking": "回传历史思考内容",
+          "slot_id": "Slot ID（llama.cpp，留空不固定）",
+          "top_p": "Top-P",
+          "min_p": "Min-P（llama.cpp）",
+          "top_k": "Top-K（llama.cpp，0=关闭）",
+          "repeat_penalty": "重复惩罚",
+          "presence_penalty": "存在惩罚",
+          "chat_template_args": "Chat Template 参数（JSON）",
+          "request_body_params": "附加请求体参数（JSON）",
+          "custom_headers": "自定义 HTTP 头（JSON）"
+        }
       }
     },
     "error": {
-      "already_added": "该提供商已添加"
+      "already_added": "该提供商已添加",
+      "invalid_json": "JSON 格式错误（或 k=v 行格式不合法）"
     }
   },
   "entity": {

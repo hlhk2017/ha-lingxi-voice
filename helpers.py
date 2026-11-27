@@ -18,6 +18,7 @@ from .const import (
     CONF_NAME,
     CONF_PROVIDER,
     CONF_PROVIDERS_EXTRA,
+    CONF_PROTOCOL,
     CONF_STT_MODEL,
     CONF_STT_PROVIDER,
     CONF_STT_SRC,
@@ -55,8 +56,12 @@ CAPABILITY_SRC_KEY = {
 }
 
 
-def provider_kind(name: str | None, base_url: str | None) -> str:
-    """Classify a provider as openai / doubao / mimo."""
+def provider_kind(
+    name: str | None, base_url: str | None, protocol: str | None = None
+) -> str:
+    """Classify a provider as openai / doubao / mimo / anthropic / ollama."""
+    if protocol in ("openai", "anthropic", "ollama"):
+        return protocol
     if name in PROVIDER_KINDS:
         return PROVIDER_KINDS[name]
     base = (base_url or "").lower()
@@ -64,6 +69,10 @@ def provider_kind(name: str | None, base_url: str | None) -> str:
         return "mimo"
     if "openspeech.bytedance" in base:
         return "doubao"
+    if "anthropic" in base:
+        return "anthropic"
+    if "11434" in base or "ollama" in base:
+        return "ollama"
     return "openai"
 
 
@@ -76,7 +85,9 @@ def get_providers(entry: ConfigEntry) -> dict[str, dict]:
             "name": data.get(CONF_PROVIDER) or "main",
             "base_url": main_base,
             "api_key": data.get(CONF_API_KEY) or "",
-            "kind": provider_kind(data.get(CONF_PROVIDER), main_base),
+            "kind": provider_kind(
+                data.get(CONF_PROVIDER), main_base, data.get(CONF_PROTOCOL)
+            ),
         }
     }
     try:
@@ -91,7 +102,8 @@ def get_providers(entry: ConfigEntry) -> dict[str, dict]:
             "name": item.get("name") or f"提供商 {index + 1}",
             "base_url": base,
             "api_key": item.get("api_key") or "",
-            "kind": item.get("kind") or provider_kind(item.get("name"), base),
+            "kind": item.get("kind")
+            or provider_kind(item.get("name"), base, item.get("protocol")),
         }
     return providers
 
@@ -137,7 +149,7 @@ def resolve_uid(entry: ConfigEntry) -> str:
     return DEFAULT_DOUBAO_UID
 
 
-def build_device_info(entry: ConfigEntry, model: str | None = None, version: str = "1.1.0") -> DeviceInfo:
+def build_device_info(entry: ConfigEntry, model: str | None = None, version: str = "1.3.0") -> DeviceInfo:
     """Return a shared DeviceInfo so all platforms show one device per provider."""
     data = entry.data
     # 设备型号统一显示对话主模型，避免被 AI 任务/STT 模型覆盖

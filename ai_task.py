@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import base64
-import io
 import json
 import logging
 from typing import Any
 
-import aiohttp
 import probatio
 
 from homeassistant.components.ai_task import (
@@ -24,29 +22,32 @@ from homeassistant.components.ai_task import (
     NoulAnswer,
     ScoreAnswer,
 )
+from homeassistant.components.conversation import AssistantContent
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import llm
+from homeassistant.helpers.llm import selector_serializer
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .helpers import build_device_info, resolve_target
+from . import api
 from .const import (
-    PROVIDER_IMAGE_BASE,
-    CONF_API_KEY,
-    CONF_BASE_URL,
-    CONF_IMAGE_BASE_URL,
     CONF_IMAGE_MODEL,
     CONF_LLM_MODEL,
+    CONF_TASK_MAX_TOKENS,
     CONF_TASK_MODEL,
+    CONF_TASK_TEMPERATURE,
+    CONF_TEMPERATURE,
     DEFAULT_MAX_TOKENS,
+    DEFAULT_TASK_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
     DOMAIN,
+    PROVIDER_IMAGE_BASE,
     short_model_name,
 )
+from .helpers import build_device_info, resolve_target
 
 _LOGGER = logging.getLogger(__name__)
-
-REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 IMAGE_SYSTEM_PROMPT = (
     "You are an expert prompt engineer for text-to-image models. "
@@ -58,8 +59,10 @@ EVAL_SYSTEM_PROMPT = (
     "You evaluate questions about Home Assistant state. "
     "Answer strictly as JSON. For each question id return an object: "
     '{"type":"noul","noul":<probability 0..1>} for yes/no, '
-    '{"type":"choice","choice":"<one of the criteria keys>","probabilities":{...}} for choice, '
-    '{"type":"score","score":<expected level index>,"probabilities":[...]} for score. '
+    '{"type":"choice","choice":"<one of the criteria keys>","probabilities":{<key>:<probability>}} '
+    "for choice, and "
+    '{"type":"score","score":<expected level index>,"probabilities":[<prob per level>]} '
+    "for score. Probabilities must sum to 1. "
     'Wrap all answers in {"answers": {...}}.'
 )
 
@@ -84,12 +87,13 @@ class AIVoiceAITaskEntity(AITaskEntity):
         self._entry = entry
         self._attr_unique_id = f"{DOMAIN}_ai_task_{entry.entry_id}"
         self._attr_name = f"AI 任务（{short_model_name(entry.data.get(CONF_TASK_MODEL) or entry.data[CONF_LLM_MODEL])}）"
-        self._attr_supported_features = AITaskEntityFeature.GENERATE_DATA | AITaskEntityFeature.EVALUATE
-        if entry.data.get(CONF_IMAGE_MODEL):
-            self._attr_supported_features |= AITaskEntityFeature.GENERATE_IMAGE
-        self._model: str = entry.data.get(CONF_TASK_MODEL) or entry.data[CONF_LLM_MODEL]
-        self._attr_device_info = build_device_info(entry, self._model)
+        self._attr_device_info = build_device_info(
+            entry, entry.data.get(CONF_TASK_MODEL) or entry.data[CONF_LLM_MODEL]
+        )
 
+    # ------------------------------------------------------------------
+    # 目标解析
+    # ------------------------------------------------------------------
     @property
     def _chat_target(self) -> dict:
         """Provider + model used for AI tasks (chat)."""
@@ -114,74 +118,144 @@ class AIVoiceAITaskEntity(AITaskEntity):
         return self._image_target["model"]
 
     @property
+    def _temperature(self) -> float:
+        """Temperature used for AI tasks."""
+        return api.get_float(
+            self._entry,
+            CONF_TASK_TEMPERATURE,
+            api.get_float(self._entry, CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+        )
+
+    @property
+    def _max_tokens(self) -> int:
+        """Max output tokens used for AI tasks."""
+        return api.get_int(self._entry, CONF_TASK_MAX_TOKENS, DEFAULT_TASK_MAX_TOKENS)
+
+    @property
     def supported_features(self) -> AITaskEntityFeature:
         """Expose image generation only when an image model is configured now."""
-        features = AITaskEntityFeature.GENERATE_DATA | AITaskEntityFeature.EVALUATE
+        features = (
+            AITaskEntityFeature.GENERATE_DATA
+            | AITaskEntityFeature.EVALUATE
+            | AITaskEntityFeature.SUPPORT_ATTACHMENTS
+        )
         if self._image_model_current:
             features |= AITaskEntityFeature.GENERATE_IMAGE
         return features
 
-    async def _async_chat(self, messages: list[dict[str, Any]], *, json_mode: bool = False) -> str:
-        """Call /chat/completions and return the assistant text."""
+    # ------------------------------------------------------------------
+    # 通用请求
+    # ------------------------------------------------------------------
+    async def _async_chat(
+        self,
+        chat_log,
+        messages: list[dict[str, Any]],
+        *,
+        json_mode: bool = False,
+        tools: list[dict[str, Any]] | None = None,
+        iteration: int = 0,
+    ) -> dict[str, Any]:
+        """Call /chat/completions and return the first choice's message."""
         body: dict[str, Any] = {
             "model": self._chat_model,
             "messages": messages,
-            "temperature": DEFAULT_TEMPERATURE,
-            "max_tokens": max(DEFAULT_MAX_TOKENS, 800),
+            "temperature": self._temperature,
+            "max_tokens": max(self._max_tokens, DEFAULT_MAX_TOKENS),
             "stream": False,
         }
-        target = self._chat_target
-        if target["kind"] == "mimo":
-            body["thinking"] = {"type": "disabled"}
         if json_mode:
             body["response_format"] = {"type": "json_object"}
-        session = async_get_clientsession(self.hass)
-        if target["kind"] == "mimo":
-            headers = {"api-key": target["api_key"], "Content-Type": "application/json"}
-        else:
-            headers = {
-                "Authorization": f"Bearer {target['api_key']}",
-                "Content-Type": "application/json",
-            }
-        async with session.post(
-            f"{target['base_url'].rstrip('/')}/chat/completions",
-            headers=headers,
-            json=body,
-            timeout=REQUEST_TIMEOUT,
-        ) as resp:
-            payload = await resp.text()
-            if resp.status != 200:
-                _LOGGER.error("Chat API error %s: %s", resp.status, payload[:300])
-                raise RuntimeError(f"chat_api_http_{resp.status}")
-        data = json.loads(payload)
-        return ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        if tools:
+            body["tools"] = tools
+            body["tool_choice"] = "auto"
 
+        variables = api.conversation_variables(
+            self.hass, getattr(chat_log, "conversation_id", None)
+        )
+        data = await api.async_chat_completion(
+            self.hass,
+            self._entry,
+            self._chat_target,
+            body,
+            variables=variables,
+            iteration=iteration,
+        )
+        return api.first_choice(data).get("message") or {}
+
+    @staticmethod
+    def _schema_hint(messages: list[dict[str, Any]], structure: Any) -> None:
+        """Append a JSON-Schema instruction to the system message."""
+        schema = probatio.to_openapi(
+            structure,
+            custom_serializer=selector_serializer,
+            openapi_version="3.1.0",
+        )
+        hint = (
+            " Respond with a single JSON object that validates against this JSON Schema: "
+            + json.dumps(schema, ensure_ascii=False)
+        )
+        for message in messages:
+            if message.get("role") == "system":
+                message["content"] = (message.get("content") or "") + hint
+                return
+        messages.insert(0, {"role": "system", "content": hint.strip()})
+
+    # ------------------------------------------------------------------
+    # 数据生成（支持附件 + 工具）
+    # ------------------------------------------------------------------
     async def _async_generate_data(
         self, task: GenDataTask, chat_log
     ) -> GenDataTaskResult:
         """Generate structured/text data for an AI Task."""
-        messages = [
-            {"role": "system", "content": "You are a helpful Home Assistant expert. Follow the instructions exactly."},
-            {"role": "user", "content": task.instructions},
-        ]
-        if task.structure is not None:
-            schema = probatio.to_openapi(task.structure, openapi_version="3.1.0")
-            messages[0]["content"] += (
-                " Respond with a single JSON object that validates against this JSON Schema: "
-                + json.dumps(schema, ensure_ascii=False)
+        tools = api.convert_tools(chat_log.llm_api)
+        max_iterations = 3 if tools else 1
+        answer_text = ""
+
+        for iteration in range(max_iterations):
+            messages = await api.convert_content_with_attachments(
+                self.hass, chat_log.content, include_thinking=False
             )
-            text = await self._async_chat(messages, json_mode=True)
+            if task.structure is not None:
+                self._schema_hint(messages, task.structure)
+
+            message = await self._async_chat(
+                chat_log,
+                messages,
+                json_mode=task.structure is not None,
+                tools=tools or None,
+                iteration=iteration,
+            )
+            tool_calls = api.parse_tool_calls(message.get("tool_calls") or [])
+            content_text = api.clean_output(self._entry, message.get("content")) or ""
+
+            if tool_calls:
+                content = AssistantContent(
+                    agent_id=self.entity_id,
+                    content=content_text or None,
+                    tool_calls=tool_calls,
+                )
+                async for _result in chat_log.async_add_assistant_content(content):
+                    pass
+                continue
+
+            answer_text = content_text
+            break
+
+        if task.structure is not None and answer_text:
             try:
-                parsed = json.loads(text)
+                parsed = json.loads(answer_text)
             except ValueError:
-                parsed = text
+                parsed = answer_text
             return GenDataTaskResult(
                 conversation_id=chat_log.conversation_id, data=parsed
             )
+        return GenDataTaskResult(
+            conversation_id=chat_log.conversation_id, data=answer_text
+        )
 
-        text = await self._async_chat(messages)
-        return GenDataTaskResult(conversation_id=chat_log.conversation_id, data=text)
-
+    # ------------------------------------------------------------------
+    # 决策评估
+    # ------------------------------------------------------------------
     async def _async_evaluate(self, task: EvaluationTask) -> EvaluationTaskResult:
         """Answer typed evaluation questions."""
         questions = {qid: dict(q) for qid, q in task.questions.items()}
@@ -191,13 +265,31 @@ class AIVoiceAITaskEntity(AITaskEntity):
         }
         messages = [
             {"role": "system", "content": EVAL_SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)},
+            {
+                "role": "user",
+                "content": json.dumps(payload, ensure_ascii=False, default=str),
+            },
         ]
-        text = await self._async_chat(messages, json_mode=True)
+        body: dict[str, Any] = {
+            "model": self._chat_model,
+            "messages": messages,
+            "temperature": 0,
+            "max_tokens": max(self._max_tokens, 800),
+            "stream": False,
+            "response_format": {"type": "json_object"},
+        }
         try:
+            data = await api.async_chat_completion(
+                self.hass,
+                self._entry,
+                self._chat_target,
+                body,
+                variables=api.conversation_variables(self.hass, None),
+            )
+            text = (api.first_choice(data).get("message") or {}).get("content") or ""
             raw = json.loads(text).get("answers") or {}
-        except ValueError:
-            _LOGGER.warning("Evaluation returned non-JSON: %s", text[:200])
+        except (RuntimeError, ValueError):
+            _LOGGER.warning("Evaluation request failed", exc_info=True)
             raw = {}
 
         answers = {}
@@ -205,22 +297,45 @@ class AIVoiceAITaskEntity(AITaskEntity):
             item = raw.get(qid) or {}
             qtype = question.get("type")
             if qtype == "noul":
-                try:
-                    answers[qid] = NoulAnswer(noul=float(item.get("noul", 0)))
-                except (TypeError, ValueError):
-                    answers[qid] = NoulAnswer(noul=0.0)
+                answers[qid] = NoulAnswer(
+                    noul=_clamp(_as_float(item.get("noul"), 0.0), 0.0, 1.0)
+                )
             elif qtype == "choice":
+                criteria = question.get("criteria") or {}
+                probabilities = _normalize(
+                    {
+                        str(k): _as_float(v, 0.0)
+                        for k, v in (item.get("probabilities") or {}).items()
+                        if str(k) in criteria
+                    }
+                )
                 choice = str(item.get("choice") or "")
-                if choice not in (question.get("criteria") or {}):
-                    choice = next(iter((question.get("criteria") or {}).keys()), "")
-                answers[qid] = ChoiceAnswer(choice=choice, probabilities={})
+                if choice not in criteria:
+                    choice = max(
+                        probabilities, key=probabilities.get, default=""
+                    ) or next(iter(criteria), "")
+                answers[qid] = ChoiceAnswer(choice=choice, probabilities=probabilities)
             else:  # score
-                try:
-                    answers[qid] = ScoreAnswer(score=float(item.get("score", 0)), probabilities=[])
-                except (TypeError, ValueError):
-                    answers[qid] = ScoreAnswer(score=0.0, probabilities=[])
+                levels = question.get("criteria") or []
+                raw_probs = [
+                    _as_float(value, 0.0) for value in (item.get("probabilities") or [])
+                ][: len(levels)]
+                if levels and len(raw_probs) != len(levels):
+                    raw_probs = [1.0 / len(levels)] * len(levels)
+                probabilities = _normalize_list(raw_probs)
+                score = _as_float(item.get("score"), 0.0)
+                if levels and not 0 <= score <= len(levels) - 1:
+                    score = (
+                        max(range(len(probabilities)), key=probabilities.__getitem__)
+                        if probabilities
+                        else 0.0
+                    )
+                answers[qid] = ScoreAnswer(score=score, probabilities=probabilities)
         return EvaluationTaskResult(answers=answers)
 
+    # ------------------------------------------------------------------
+    # 图片生成
+    # ------------------------------------------------------------------
     async def _async_generate_image(
         self, task: GenImageTask, chat_log
     ) -> GenImageTaskResult:
@@ -231,20 +346,25 @@ class AIVoiceAITaskEntity(AITaskEntity):
 
         session = async_get_clientsession(self.hass)
         image_target = self._image_target
-        headers = {
-            "Authorization": f"Bearer {image_target['api_key']}",
-            "Content-Type": "application/json",
-        }
+        headers = api.build_headers(
+            self._entry,
+            {**image_target, "kind": "openai"},
+            self.hass,
+            api.conversation_variables(self.hass, getattr(chat_log, "conversation_id", None)),
+        )
 
         # 1) 用对话模型把中文需求转成英文提示词
         prompt = task.instructions
         try:
-            prompt = await self._async_chat(
+            message = await self._async_chat(
+                chat_log,
                 [
                     {"role": "system", "content": IMAGE_SYSTEM_PROMPT},
                     {"role": "user", "content": task.instructions},
-                ]
-            ) or task.instructions
+                ],
+            )
+            rewritten = (message.get("content") or "").strip()
+            prompt = api.strip_think(rewritten) or task.instructions
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Prompt rewrite failed, using raw instructions")
 
@@ -259,7 +379,7 @@ class AIVoiceAITaskEntity(AITaskEntity):
             f"{image_target['base_url']}/images/generations",
             headers=headers,
             json=payload,
-            timeout=REQUEST_TIMEOUT,
+            timeout=api.REQUEST_TIMEOUT,
         ) as resp:
             body = await resp.text()
             if resp.status != 200:
@@ -278,7 +398,9 @@ class AIVoiceAITaskEntity(AITaskEntity):
                     b64 = b64.split(",", 1)[1]
                 image_bytes = base64.b64decode(b64)
             elif first.get("url"):
-                async with session.get(first["url"], timeout=REQUEST_TIMEOUT) as img_resp:
+                async with session.get(
+                    first["url"], timeout=api.REQUEST_TIMEOUT
+                ) as img_resp:
                     image_bytes = await img_resp.read()
             elif first.get("image"):
                 image_bytes = base64.b64decode(first["image"])
@@ -295,3 +417,30 @@ class AIVoiceAITaskEntity(AITaskEntity):
             model=image_model,
             revised_prompt=prompt,
         )
+
+
+def _as_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def _normalize_list(values: list[float]) -> list[float]:
+    """Normalize a probability list."""
+    total = sum(values)
+    if total <= 0:
+        return []
+    return [value / total for value in values]
+
+
+def _normalize(values: dict[str, float]) -> dict[str, float]:
+    """Normalize a probability map, falling back to an empty map."""
+    total = sum(values.values())
+    if total <= 0:
+        return {}
+    return {key: value / total for key, value in values.items()}

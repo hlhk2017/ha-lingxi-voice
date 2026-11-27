@@ -4,6 +4,8 @@
 
 灵犀语音是一个面向中国用户的 Home Assistant 自定义集成。它把「大模型对话」「语音识别」「语音合成」「AI 任务」四类平台打包在一起，并允许**每个模型来自不同的服务商**——对话用一家、语音识别用另一家、语音合成再用第三家也没问题。
 
+<sub>**1.2** 起加入生成控制（流式、采样参数、上下文注入等），**1.3** 起支持 Anthropic 与 Ollama 原生协议。版本差异见 [CHANGELOG.md](./CHANGELOG.md)。</sub>
+
 ---
 
 ## ✨ 核心特点
@@ -16,18 +18,41 @@
 
 - **多提供商混搭（每个模型独立来源）**
   - 对话模型、AI 任务模型、图片生成模型、语音识别模型、语音合成模型可以分别选择不同服务商
-  - 配置时自动读取各服务商的 `/models` 分类展示；支持「使用其它提供商配置」为某个模型单独加一家服务商
+  - 配置时自动读取各服务商的模型列表分类展示；支持「使用其它提供商配置」为某个模型单独加一家服务商
+
+- **三种 LLM 协议，开箱即用**
+  - **OpenAI 兼容**：`/chat/completions` —— 硅基流动、DeepSeek、DashScope、Moonshot、智谱、Groq、OpenAI、华为云 MaaS、火山方舟、小米 MiMo 等
+  - **Anthropic 兼容**：`/v1/messages` —— Claude 及兼容端点（含 `x-api-key` 认证、`thinking` 块、工具调用、多模态）
+  - **Ollama 原生**：`/api/chat` —— 本地 Ollama 或 Ollama Cloud（NDJSON 流式、`options` 采样、`images` 多模态）
+  - 配置流程里的「协议」字段可显式指定，或选「自动识别」按服务商/地址推断
 
 - **常见服务商开箱即用**（内置中文预设）
   - 硅基流动 SiliconFlow、DeepSeek、阿里云百炼 DashScope、月之暗面 Moonshot、智谱 BigModel、Groq、OpenAI
+  - **Anthropic Claude**、**Ollama（本地 / Cloud）**
   - 华为云 MaaS（按量付费 / Token Plan）
   - 火山引擎 方舟（Ark）、**豆包语音（SeedASR）**、**小米 MiMo**
-  - 自定义 OpenAI 兼容服务（填 base_url 即可）
+  - 自定义服务（填 base_url 即可）
 
-- **不只是 OpenAI 兼容**
+- **不只是 OpenAI 兼容（语音侧）**
   - 语音识别：OpenAI 兼容 `/audio/transcriptions`、豆包 SeedASR（录音文件识别协议）、小米 MiMo ASR（`chat/completions + input_audio`）
   - 语音合成：OpenAI 兼容 `/audio/speech`、小米 MiMo TTS（9 种预置音色）
   - 图像生成：OpenAI 兼容 `/images/generations`，自动适配华为云 MaaS 的生图地址
+
+- **生成控制（1.2+）**
+  - 流式响应（OpenAI SSE / Anthropic SSE / Ollama NDJSON），失败自动回退非流式
+  - 温度、最大输出 token、历史消息条数可配（对话与 AI Task 分开）
+  - 自动剥离 `think` 标签（流式跨分块也能处理）、可选剥离 emoji
+  - 上下文注入：Jinja2 模板 + System / Tool Result / Assistant / User 角色，可使用 `device` / `area` / `floor` 变量
+  - 自定义 HTTP 头、附加请求体参数、Chat Template 参数（均支持 Jinja2）
+  - 服务端专项：DeepSeek `reasoning_effort`、llama.cpp slot 与采样参数、vLLM 思考 token 预算、LocalAI `metadata`
+  - 并行工具调用、工具调用轮数上限
+  - 每次补全发出 `ai_voice_generation_complete` 事件（usage / timings / 是否流式）
+
+- **AI Task 增强**
+  - 支持图片附件（多模态输入）
+  - 结构化数据生成支持工具调用
+  - `ai_task.evaluate` 概率归一化
+  - 图片生成走 OpenAI Images API，自动适配华为云 MaaS
 
 - **配置流程友好**
   - 中文界面（含字段汉化）
@@ -42,8 +67,9 @@
   - 内置语音助手提示词（回答简短、口语化、不读代码/实体 ID）
   - 对话被打断时不会把错误文本读出来
   - 空音频（静音）友好处理
+  - 被剥离成空回答时自动补一句「好的。」，避免静音
 
-
+---
 
 ## 📦 安装
 
@@ -82,7 +108,7 @@
 ## 🚀 配置
 
 1. 设置 → 设备与服务 → 添加集成 → 搜索 **灵犀语音**
-2. **步骤 1**：选择服务商 + 填 API Key +（可选）自定义名称
+2. **步骤 1**：选择服务商 + 填 API Key +（可选）自定义名称与**协议**
 3. **步骤 2**：依次选择
    - 对话模型
    - AI 任务模型
@@ -92,6 +118,28 @@
    - 对话提示词
 4. 某类模型想要别的服务商？在下拉里选「（使用其它提供商配置）」→ 添加服务商 → 只选该类模型
 5. 完成。集成会自动创建对应实体（对话 / STT / TTS / AI 任务）
+6. （可选）要调整生成参数：设置 → 设备与服务 → 灵犀语音 → **配置** → 勾选「配置高级参数」
+
+### 高级参数（1.2+）
+
+在集成的**配置**页面勾选「配置高级参数」后进入，按需调整：
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| 服务端类型 | 通用 | 通用 / DeepSeek Cloud / llama.cpp / vLLM / LocalAI / Ollama，决定显示哪些专项参数 |
+| 温度 / 最大输出 token | 0.4 / 240 | 对话采样 |
+| AI 任务温度 / 最大 token | 跟随对话 / 800 | 结构化输出可加大 |
+| 保留历史消息条数 | 24 | 防止上下文溢出 |
+| 剥离思考标签 / emoji | 开 / 关 | `think` 标签在流式下同样处理 |
+| 流式响应 | 关 | 开启后对话增量输出；对语音 pipeline 无影响 |
+| 并行工具调用 / 工具轮数 | 关 / 4 | 需模型与服务端支持 |
+| 上下文注入模板 / 角色 | 当前时间 / System | Jinja2，模板可用 `device` / `area` / `floor` / `conversation_id` |
+| 思考模式 | 不干预 | 始终思考 / 仅首轮思考 |
+| 推理强度（DeepSeek） | High | High / Max |
+| 思考 token 预算（vLLM） | 空 | 留空用服务端默认 |
+| 回传历史思考 | 开 | 部分模型需关闭 |
+| Slot ID / 采样参数 | 空 / 默认 | llama.cpp 专用 |
+| Chat Template 参数 / 附加请求体参数 / 自定义 HTTP 头 | 空 | JSON 或 `k=v` 行格式，支持 Jinja2 |
 
 ### 语音助手（Assist）接入
 
@@ -106,6 +154,8 @@
 | 类型 | 提供商 | 说明 |
 |---|---|---|
 | 对话 / AI 任务 / 图片 | 硅基流动、DeepSeek、DashScope、Moonshot、智谱、Groq、OpenAI | OpenAI 兼容 |
+| 对话 / AI 任务 | Anthropic Claude | Anthropic 兼容 `/v1/messages` |
+| 对话 / AI 任务 | Ollama（本地 / Cloud） | 原生 `/api/chat` |
 | 对话 / 图片（部分） | 华为云 MaaS | 对话 `/openai/v1`，生图 `/v1`（自动适配） |
 | 对话 / 图片（需开通） | 火山引擎 方舟 Ark | 注意：需先在方舟控制台「开通模型」 |
 | 语音识别 | 硅基流动（Qwen3-ASR / SenseVoice 等）、豆包 SeedASR、小米 MiMo | 三种协议 |
@@ -113,6 +163,7 @@
 | 图片生成 | 硅基流动、华为云 MaaS、OpenAI 等 | OpenAI 兼容 |
 
 > 各服务商对模型/权限有差异，以实际账号权限为准。
+> Anthropic / Ollama 只提供对话与 AI Task 实体（STT / TTS 不会加载）。
 
 ---
 
@@ -130,6 +181,8 @@
 - 部分服务商（如火山方舟、豆包 SeedASR、小米 MiMo）需要单独开通对应服务
 - 语音识别对网络延迟敏感，建议使用国内服务商
 - 修改模型配置会自动重载，无需重启 HA
+- **Ollama 在 Docker 中部署 HA 时**：预设的 `localhost:11434` 指向容器自身，请改成宿主机 IP（如 `http://192.168.2.7:11434`）
+- 若要用 Ollama 的 OpenAI 兼容端点（`/v1`），协议请显式选「OpenAI 兼容」，否则自动识别会走原生 `/api/chat`
 
 ---
 

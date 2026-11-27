@@ -10,7 +10,8 @@
           "api_key": "API key",
           "name": "Name (optional)",
           "use_doubao": "Use Doubao voice recognition",
-          "doubao_api_key": "Doubao Voice API key"
+          "doubao_api_key": "Doubao Voice API key",
+          "protocol": "Protocol (auto / OpenAI / Anthropic / Ollama)"
         }
       },
       "models": {
@@ -38,7 +39,8 @@
           "provider": "Provider",
           "api_key": "API key",
           "name": "Name (optional)",
-          "base_url": "Custom API base URL (only for Custom)"
+          "base_url": "Custom API base URL (only for Custom)",
+          "protocol": "Protocol (auto / OpenAI / Anthropic / Ollama)"
         }
       },
       "extra_models": {
@@ -75,7 +77,8 @@
           "image_model": "Image generation model (optional)",
           "stt_model": "Speech-to-text model (optional)",
           "tts_model": "Text-to-speech model (optional)",
-          "prompt": "Prompt"
+          "prompt": "Prompt",
+          "configure_advanced": "Configure advanced parameters"
         }
       },
       "add_provider": {
@@ -84,7 +87,8 @@
           "provider": "Provider",
           "api_key": "API key",
           "name": "Name (optional)",
-          "base_url": "Custom API base URL (only for Custom)"
+          "base_url": "Custom API base URL (only for Custom)",
+          "protocol": "Protocol (auto / OpenAI / Anthropic / Ollama)"
         }
       },
       "extra_models": {
@@ -97,10 +101,43 @@
           "stt": "Speech-to-text model",
           "tts": "Text-to-speech model"
         }
+      },
+      "advanced": {
+        "title": "Advanced parameters",
+        "description": "These options apply to the conversation agent and AI tasks. JSON fields support Jinja2 templates (e.g. the conversation_id variable); leave empty to disable. k=v lines are also accepted.",
+        "data": {
+          "server_type": "Server type (enables server-specific options)",
+          "temperature": "Conversation temperature",
+          "max_tokens": "Conversation max output tokens",
+          "task_temperature": "AI task temperature",
+          "task_max_tokens": "AI task max output tokens",
+          "history_max_messages": "History messages to keep",
+          "strip_think": "Strip thinking tags",
+          "strip_emoji": "Strip emoji",
+          "stream": "Streaming responses",
+          "parallel_tool_calls": "Parallel tool calls",
+          "max_tool_iterations": "Max tool-call iterations",
+          "context_injection_template": "Context injection template (Jinja2)",
+          "context_injection_role": "Context injection role",
+          "thinking_mode": "Thinking mode",
+          "reasoning_effort": "Reasoning effort (DeepSeek)",
+          "thinking_token_budget": "Thinking token budget (vLLM, empty = server default)",
+          "include_prior_thinking": "Include prior thinking",
+          "slot_id": "Slot ID (llama.cpp, empty = any)",
+          "top_p": "Top-P",
+          "min_p": "Min-P (llama.cpp)",
+          "top_k": "Top-K (llama.cpp, 0 = off)",
+          "repeat_penalty": "Repeat penalty",
+          "presence_penalty": "Presence penalty",
+          "chat_template_args": "Chat template arguments (JSON)",
+          "request_body_params": "Additional request body parameters (JSON)",
+          "custom_headers": "Custom HTTP headers (JSON)"
+        }
       }
     },
     "error": {
-      "already_added": "This provider is already added"
+      "already_added": "This provider is already added",
+      "invalid_json": "Invalid JSON (or k=v lines)"
     }
   },
   "entity": {
