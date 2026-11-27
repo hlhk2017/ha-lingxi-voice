@@ -115,8 +115,9 @@ class AIVoiceTTSEntity(TextToSpeechEntity):
         }
         session = async_get_clientsession(self.hass)
         base = (self._target["base_url"] or "").rstrip("/")
+        url = f"{base}/chat/completions"
         async with session.post(
-            f"{base}/chat/completions",
+            url,
             headers={
                 "api-key": self._target["api_key"],
                 "Content-Type": "application/json",
@@ -126,7 +127,9 @@ class AIVoiceTTSEntity(TextToSpeechEntity):
         ) as resp:
             payload = await resp.text()
             if resp.status != 200:
-                _LOGGER.error("MiMo TTS failed (%s): %s", resp.status, payload[:300])
+                _LOGGER.error(
+                    "MiMo TTS failed (%s %s): %s", resp.status, url, payload[:300]
+                )
                 raise RuntimeError(f"tts_api_http_{resp.status}")
         data = json.loads(payload)
         try:
@@ -152,8 +155,9 @@ class AIVoiceTTSEntity(TextToSpeechEntity):
             "response_format": "mp3",
         }
         session = async_get_clientsession(self.hass)
+        url = f"{target['base_url'].rstrip('/')}/audio/speech"
         async with session.post(
-            f"{target['base_url'].rstrip('/')}/audio/speech",
+            url,
             headers={
                 "Authorization": f"Bearer {target['api_key']}",
                 "Content-Type": "application/json",
@@ -163,7 +167,9 @@ class AIVoiceTTSEntity(TextToSpeechEntity):
         ) as resp:
             if resp.status != 200:
                 payload = await resp.text()
-                _LOGGER.error("TTS /audio/speech failed (%s): %s", resp.status, payload[:300])
+                _LOGGER.error(
+                    "TTS /audio/speech failed (%s %s): %s", resp.status, url, payload[:300]
+                )
                 raise RuntimeError(f"tts_api_http_{resp.status}")
             audio = await resp.read()
         if not audio:

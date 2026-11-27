@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
 from .const import (
+    MIMO_ASR_MODEL,
+    MIMO_TTS_MODELS,
     CONF_API_KEY,
     CONF_BASE_URL,
     CONF_DOUBAO_API_KEY,
@@ -39,6 +42,8 @@ from .const import (
     provider_label,
     short_model_name,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 CAPABILITY_MODEL_KEY = {
     "llm": CONF_LLM_MODEL,
@@ -141,6 +146,45 @@ def resolve_target(entry: ConfigEntry, capability: str) -> dict:
     if capability == "tts" and not data.get(CONF_TTS_SRC):
         if (data.get(CONF_TTS_PROVIDER) or "") == TTS_PROVIDER_MIMO:
             result["kind"] = "mimo"
+
+    # ---- 自愈：MiMo 模型被配到了非 MiMo 提供商（历史数据/误选）----
+    # 例如 TTS 模型 mimo-v2.5-tts 却指向华为云，会请求 /audio/speech 得到 404。
+    if capability == "tts" and result["kind"] != "mimo" and result["model"] in MIMO_TTS_MODELS:
+        fallback = next(
+            (p for p in providers.values() if p["kind"] == "mimo"), None
+        )
+        if fallback:
+            _LOGGER.warning(
+                "TTS 模型 %s 需要小米 MiMo 提供商，当前提供商为 %s，已自动切换",
+                result["model"],
+                result["name"],
+            )
+            result.update(
+                name=fallback["name"],
+                base_url=fallback["base_url"],
+                api_key=fallback["api_key"],
+                kind="mimo",
+            )
+    if (
+        capability == "stt"
+        and result["kind"] != "mimo"
+        and result["model"] == MIMO_ASR_MODEL
+    ):
+        fallback = next(
+            (p for p in providers.values() if p["kind"] == "mimo"), None
+        )
+        if fallback:
+            _LOGGER.warning(
+                "STT 模型 %s 需要小米 MiMo 提供商，当前提供商为 %s，已自动切换",
+                result["model"],
+                result["name"],
+            )
+            result.update(
+                name=fallback["name"],
+                base_url=fallback["base_url"],
+                api_key=fallback["api_key"],
+                kind="mimo",
+            )
     return result
 
 
