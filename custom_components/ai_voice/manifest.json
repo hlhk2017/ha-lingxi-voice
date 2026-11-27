@@ -3,7 +3,7 @@
   "name": "灵犀语音",
   "codeowners": [
     "@hlhk2017"
-  ],
+  ], 
   "config_flow": true,
   "dependencies": [
     "conversation",
