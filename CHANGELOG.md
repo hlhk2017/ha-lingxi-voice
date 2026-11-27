@@ -54,6 +54,13 @@
 - Anthropic 不支持回传历史 thinking（缺少 signature），`include_prior_thinking` 对其无效。
 - 图片输入：代码已支持（Anthropic `image` block / Ollama `images`），本轮仅验证 OpenAI 路径。
 
+### 致谢
+
+本版本及 1.2.0 中的生成控制能力（流式、思考标签处理、上下文注入、服务端专项参数、
+自定义 HTTP 头与请求体参数等）参考并改写了
+[Local OpenAI LLM](https://github.com/skye-harris/hass_local_openai_llm)（Apache-2.0）的实现，
+版权归其作者及贡献者所有；该 upstream 本身 fork 自 Home Assistant 官方 OpenRouter 集成。
+
 ## 1.2.0 — 整合 Local OpenAI LLM 的生成控制能力
 
 本次更新把 [Local OpenAI LLM](https://github.com/skye-harris/hass_local_openai_llm) 中

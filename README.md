@@ -186,6 +186,24 @@
 
 ---
 
+## 🙏 致谢与参考
+
+本项目的部分实现**参考并改写了**以下开源项目的代码与设计，特此注明：
+
+- **[Local OpenAI LLM](https://github.com/skye-harris/hass_local_openai_llm)**（Apache-2.0）
+  —— 流式响应、思考标签处理、上下文注入、服务端专项参数（DeepSeek / llama.cpp / vLLM / LocalAI）、
+  自定义 HTTP 头与请求体参数等能力参考了该项目的实现。
+  相关代码版权归其作者 [@skye-harris](https://github.com/skye-harris) 及贡献者所有，
+  如再分发请遵守其 [Apache-2.0 许可](https://github.com/skye-harris/hass_local_openai_llm/blob/main/LICENSE)。
+- Local OpenAI LLM 本身 fork 自 Home Assistant 官方
+  [OpenRouter 集成](https://github.com/home-assistant/core/tree/dev/homeassistant/components/open_router)
+  （作者 [@joostlek](https://github.com/joostlek)），特此一并致谢。
+- 语音侧协议（豆包 SeedASR、小米 MiMo ASR/TTS）参考了各服务商公开文档与社区示例。
+
+本仓库自身代码采用 MIT 许可；上述参考部分若涉及再分发，请同时遵守其原始许可。
+
+---
+
 ## 📄 许可
 
 MIT License

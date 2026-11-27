@@ -3,6 +3,9 @@
 v1.2.0 引入，供 conversation / ai_task 复用。
 """
 
+# 部分实现参考 Local OpenAI LLM（Apache-2.0）：
+# https://github.com/skye-harris/hass_local_openai_llm
+
 from __future__ import annotations
 
 import asyncio

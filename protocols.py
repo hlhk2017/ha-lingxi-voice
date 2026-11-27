@@ -4,6 +4,9 @@
 由本模块负责请求转换与响应归一化，上层 conversation/ai_task 无需感知协议差异。
 """
 
+# 部分实现参考 Local OpenAI LLM（Apache-2.0）：
+# https://github.com/skye-harris/hass_local_openai_llm
+
 from __future__ import annotations
 
 import json

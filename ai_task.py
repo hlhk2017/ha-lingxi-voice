@@ -1,5 +1,8 @@
 """AI Task platform (Home Assistant "AI 建议" / AI Task entities)."""
 
+# 部分实现参考 Local OpenAI LLM（Apache-2.0）：
+# https://github.com/skye-harris/hass_local_openai_llm
+
 from __future__ import annotations
 
 import base64
