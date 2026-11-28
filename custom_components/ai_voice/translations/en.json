@@ -78,7 +78,8 @@
           "stt_model": "Speech-to-text model (optional)",
           "tts_model": "Text-to-speech model (optional)",
           "prompt": "Prompt",
-          "configure_advanced": "Configure advanced parameters"
+          "configure_advanced": "Configure advanced parameters",
+          "tts_voice": "TTS voice (empty = provider default)"
         }
       },
       "add_provider": {

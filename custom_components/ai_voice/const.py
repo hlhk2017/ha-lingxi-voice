@@ -61,6 +61,33 @@ MIMO_TTS_VOICES = {
 MIMO_DEFAULT_TTS_MODEL = "mimo-v2.5-tts"
 MIMO_DEFAULT_VOICE = "mimo_default"
 
+# OpenAI 兼容 TTS 音色（来源：OpenAI Audio 文档）
+OPENAI_TTS_VOICES: dict[str, str] = {
+    "alloy": "Alloy（中性）",
+    "ash": "Ash（男）",
+    "ballad": "Ballad（男·抒情）",
+    "coral": "Coral（女）",
+    "echo": "Echo（男）",
+    "fable": "Fable（英伦）",
+    "nova": "Nova（女）",
+    "onyx": "Onyx（低沉男）",
+    "sage": "Sage（女）",
+    "shimmer": "Shimmer（女）",
+    "verse": "Verse（男·多语）",
+}
+DEFAULT_OPENAI_VOICE = "alloy"
+
+# CosyVoice（硅基流动等）常用音色
+COSYVOICE_VOICES: dict[str, str] = {
+    "中文女": "中文女",
+    "中文男": "中文男",
+    "粤语女": "粤语女",
+    "英文女": "英文女",
+    "英文男": "英文男",
+    "日语女": "日语女",
+    "韩语女": "韩语女",
+}
+
 STT_PROVIDER_OPTIONS = {
     STT_PROVIDER_NONE: "（不使用语音识别）",
     STT_PROVIDER_OPENAI: "OpenAI 兼容（/audio/transcriptions）",

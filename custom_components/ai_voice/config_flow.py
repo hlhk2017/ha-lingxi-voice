@@ -29,7 +29,7 @@ from homeassistant.helpers.selector import (
 )
 
 from . import protocols
-from .helpers import get_providers
+from .helpers import get_providers, resolve_target
 
 from .const import (
     CONF_API_KEY,
@@ -102,8 +102,12 @@ from .const import (
     MIMO_DEFAULT_TTS_MODEL,
     MIMO_DEFAULT_VOICE,
     MIMO_TTS_MODELS,
+    MIMO_DEFAULT_VOICE,
     MIMO_TTS_VOICES,
     PROVIDER_IMAGE_BASE,
+    COSYVOICE_VOICES,
+    DEFAULT_OPENAI_VOICE,
+    OPENAI_TTS_VOICES,
     PROTOCOL_OPTIONS,
     PROVIDER_LABELS,
     REASONING_EFFORTS,
@@ -197,6 +201,88 @@ async def _fetch_models(hass, base_url: str, api_key: str, kind: str) -> list[st
             if model.get("name")
         ]
     return [model.get("id") for model in data.get("data", []) if model.get("id")]
+
+
+def _voice_presets(kind: str, model: str) -> dict[str, str]:
+    """Built-in voice list based on provider kind / model (from vendor docs)."""
+    low = (model or "").lower()
+    if kind == "mimo":
+        return dict(MIMO_TTS_VOICES)
+    if "cosyvoice" in low:
+        return dict(COSYVOICE_VOICES)
+    return dict(OPENAI_TTS_VOICES)
+
+
+def _default_voice(kind: str, model: str) -> str:
+    """Default voice for a provider kind / model."""
+    low = (model or "").lower()
+    if kind == "mimo":
+        return MIMO_DEFAULT_VOICE
+    if "cosyvoice" in low:
+        return "中文女"
+    return DEFAULT_OPENAI_VOICE
+
+
+def _extract_voice_names(data) -> list[str]:
+    """Extract voice names from a few common response shapes."""
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, str)]
+    if not isinstance(data, dict):
+        return []
+    for key in ("voices", "data"):
+        value = data.get(key)
+        if isinstance(value, list):
+            names = []
+            for item in value:
+                if isinstance(item, str):
+                    names.append(item)
+                elif isinstance(item, dict):
+                    name = item.get("id") or item.get("name")
+                    if name:
+                        names.append(name)
+            if names:
+                return names
+    return []
+
+
+async def _fetch_remote_voices(hass, target: dict) -> dict[str, str]:
+    """Try to fetch a voice list from the provider; empty on failure."""
+    base = (target.get("base_url") or "").rstrip("/")
+    if not base:
+        return {}
+    kind = target.get("kind") or "openai"
+    if kind == "mimo":
+        headers = {"api-key": target.get("api_key") or ""}
+    elif kind == "anthropic":
+        return {}
+    else:
+        headers = protocols.auth_headers(kind, target.get("api_key") or "")
+
+    session = async_get_clientsession(hass)
+    for path in ("/audio/voices", "/voices", "/tts/voices"):
+        try:
+            async with session.get(
+                base + path,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                if resp.status != 200:
+                    continue
+                data = await resp.json()
+        except Exception:  # noqa: BLE001
+            continue
+        names = _extract_voice_names(data)
+        if names:
+            return {name: name for name in names}
+    return {}
+
+
+async def _async_voice_options(hass, target: dict) -> dict[str, str]:
+    """Merge built-in voices with any voice list the provider exposes."""
+    voices = _voice_presets(target.get("kind") or "openai", target.get("model") or "")
+    remote = await _fetch_remote_voices(hass, target)
+    voices.update(remote)
+    return voices
 
 
 def _buckets(kind: str, models: list[str]) -> dict[str, list[str]]:
@@ -704,6 +790,26 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
         schema[
             vol.Optional(CONF_PROMPT, default=data.get(CONF_PROMPT) or DEFAULT_PROMPT)
         ] = TextSelector(TextSelectorConfig(multiline=True))
+        if data.get(CONF_TTS_MODEL):
+            tts_target = resolve_target(entry, "tts")
+            voices = await _async_voice_options(self.hass, tts_target)
+            schema[
+                vol.Optional(
+                    CONF_TTS_VOICE,
+                    default=(data.get(CONF_TTS_VOICE) or _default_voice(
+                        tts_target["kind"], tts_target["model"]
+                    )),
+                )
+            ] = SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        {"value": value, "label": label}
+                        for value, label in voices.items()
+                    ],
+                    custom_value=True,
+                    sort=False,
+                )
+            )
         schema[vol.Optional("configure_advanced", default=False)] = BooleanSelector()
         return self.async_show_form(
             step_id="init", data_schema=vol.Schema(schema), errors=errors
@@ -1013,6 +1119,10 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             new_data[info["key"]] = model
             new_data[info["src"]] = SRC_MAIN if src_index == 0 else f"p{src_index - 1}"
         new_data[CONF_PROMPT] = self._collected.get(CONF_PROMPT) or DEFAULT_PROMPT
+        if CONF_TTS_VOICE in self._collected:
+            new_data[CONF_TTS_VOICE] = (
+                self._collected.get(CONF_TTS_VOICE) or ""
+            ).strip()
         new_data.update(self._advanced_values)
         self.hass.config_entries.async_update_entry(
             entry,
@@ -1059,6 +1169,10 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             new_data[info["key"]] = model
             new_data[info["src"]] = SRC_MAIN if src_index == 0 else f"p{src_index - 1}"
         new_data[CONF_PROMPT] = self._collected.get(CONF_PROMPT) or DEFAULT_PROMPT
+        if CONF_TTS_VOICE in self._collected:
+            new_data[CONF_TTS_VOICE] = (
+                self._collected.get(CONF_TTS_VOICE) or ""
+            ).strip()
         new_data.update(self._advanced_values)
         self.hass.config_entries.async_update_entry(
             entry,

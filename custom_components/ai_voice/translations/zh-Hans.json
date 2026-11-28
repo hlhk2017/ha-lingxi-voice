@@ -78,7 +78,8 @@
           "stt_model": "语音转文本模型（可选）",
           "tts_model": "文本转语音模型（可选）",
           "prompt": "对话提示词",
-          "configure_advanced": "配置高级参数"
+          "configure_advanced": "配置高级参数",
+          "tts_voice": "TTS 音色（留空使用服务商默认）"
         }
       },
       "add_provider": {
