@@ -239,7 +239,7 @@ def resolve_uid(entry: ConfigEntry) -> str:
     return DEFAULT_DOUBAO_UID
 
 
-def build_device_info(entry: ConfigEntry, model: str | None = None, version: str = "1.3.0") -> DeviceInfo:
+def build_device_info(entry: ConfigEntry, model: str | None = None, version: str = "1.3.1") -> DeviceInfo:
     """Return a shared DeviceInfo so all platforms show one device per provider."""
     data = entry.data
     # 设备型号统一显示对话主模型，避免被 AI 任务/STT 模型覆盖

@@ -1,5 +1,29 @@
 # 灵犀语音（ai_voice）更新记录
 
+## 1.3.1 — 设置二级菜单、TTS 音色入口、硅基流动 TTS 修复
+
+### 新增
+
+- **选项改为二级菜单**：条目「配置」先进入菜单，再分别进入
+  「模型设置 / 提示词设置 / 音色设置 / 高级设置」，另有「保存并退出」。
+  每项保存后自动写回并 reload，然后回到菜单，可连续修改。
+- **TTS 音色设置入口**（仅配置了 TTS 模型时显示），音色列表按 TTS 提供商/模型给出：
+  - 小米 MiMo：9 个（mimo_default、冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean）
+  - 硅基流动：8 个（`模型:alex/anna/bella/benjamin/charles/claire/david/diana`）
+  - 模型名含 cosyvoice：中文女/中文男/粤语女/英文女/英文男/日语女/韩语女
+  - 其它 OpenAI 兼容：alloy/ash/ballad/coral/echo/fable/nova/onyx/sage/shimmer/verse
+  - 支持自定义输入；优先尝试 `/audio/voices`、`/voices`、`/tts/voices` 自动拉取，
+    失败回退内置文档音色
+
+### 修复
+
+- **硅基流动 TTS**：`voice` 必须为 `模型名:音色名`（如 `FunAudioLLM/CosyVoice2-0.5B:alex`），
+  之前传 `alloy` / `ash` / `中文女` 会返回 `Invalid voice`（20047）。
+  现在自动加模型前缀并规范化，非法音色回退 `<model>:alex`。
+- **TTS / STT 提供商错配自愈**：MiMo 模型被配到非 MiMo 提供商时自动切换到 MiMo 并写 warning，
+  避免请求错误端点导致 404。
+- TTS 404 错误日志补充请求 URL，便于定位问题。
+
 ## 1.3.0 — 新增 Anthropic 与 Ollama 原生协议
 
 ### 新增
