@@ -709,10 +709,11 @@ class AIVoiceConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class AIVoiceOptionsFlow(OptionsFlowWithReload):
-    """Edit models of an existing entry; also supports adding another provider."""
+    """二级菜单：模型设置 / 提示词设置 / 音色设置 / 高级设置。"""
 
     def __init__(self) -> None:
-        self._collected: dict[str, str] = {}
+        self._data: dict[str, Any] | None = None
+        self._collected: dict[str, Any] = {}
         self._need: list[str] = []
         self._new_provider: dict[str, Any] | None = None
         self._new_buckets: dict[str, list[str]] = {}
@@ -720,12 +721,49 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
         self._buckets_list: list[dict[str, list[str]]] = []
         self._advanced_values: dict[str, Any] = {}
 
+    @property
+    def _entry_data(self) -> dict[str, Any]:
+        if self._data is None:
+            self._data = dict(self.config_entry.data)
+        return self._data
+
+    def _update_entry(self, new_data: dict[str, Any]) -> None:
+        self._data = dict(new_data)
+        entry = self.config_entry
+        self.hass.config_entries.async_update_entry(
+            entry,
+            data=new_data,
+            title=new_data.get(CONF_NAME)
+            or new_data.get(CONF_PROVIDER)
+            or "灵犀语音",
+        )
+        self.hass.config_entries.async_schedule_reload(entry.entry_id)
+
+    # ------------------------------------------------------------ 菜单
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show each model as a provider-prefixed dropdown."""
+        """Show the settings menu."""
+        data = self._entry_data
+        menu = ["models", "prompt"]
+        if data.get(CONF_TTS_MODEL):
+            menu.append("voice")
+        menu.extend(["advanced", "finish"])
+        return self.async_show_menu(step_id="init", menu_options=menu)
+
+    async def async_step_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Finish the options flow (changes are already applied)."""
+        return self.async_create_entry(title="", data={})
+
+    # ------------------------------------------------------------ 模型
+    async def async_step_models(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pick models from every configured provider."""
         entry = self.config_entry
-        data = dict(entry.data)
+        data = self._entry_data
         errors: dict[str, str] = {}
 
         providers = list(get_providers(entry).values())
@@ -733,29 +771,26 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
         for provider in providers:
             try:
                 models = await _fetch_models(
-                    self.hass, provider["base_url"], provider["api_key"], provider["kind"]
+                    self.hass,
+                    provider["base_url"],
+                    provider["api_key"],
+                    provider["kind"],
                 )
             except Exception:  # noqa: BLE001
                 models = []
             buckets_list.append(_buckets(provider["kind"], models))
 
         if user_input is not None:
-            self._collected = {
-                k: v
-                for k, v in user_input.items()
-                if k not in (CONF_PROMPT, "configure_advanced")
-            }
-            self._collected[CONF_PROMPT] = user_input.get(CONF_PROMPT) or DEFAULT_PROMPT
-            self._need = []
-            for cap, info in CAPABILITIES.items():
-                if (user_input.get(info["key"]) or "").strip() == OTHER_OPTION:
-                    self._need.append(cap)
+            self._collected = dict(user_input)
+            self._need = [
+                cap
+                for cap, info in CAPABILITIES.items()
+                if (user_input.get(info["key"]) or "").strip() == OTHER_OPTION
+            ]
             self._buckets_list = buckets_list
             if self._need:
                 return await self.async_step_add_provider()
-            if user_input.get("configure_advanced"):
-                return await self.async_step_advanced()
-            return self._async_save(buckets_list)
+            return await self._apply_models(buckets_list)
 
         schema: dict[Any, Any] = {}
         for cap, info in CAPABILITIES.items():
@@ -787,35 +822,99 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             schema[vol.Optional(info["key"], default=default_value)] = SelectSelector(
                 SelectSelectorConfig(options=options, custom_value=True, sort=False)
             )
-        schema[
-            vol.Optional(CONF_PROMPT, default=data.get(CONF_PROMPT) or DEFAULT_PROMPT)
-        ] = TextSelector(TextSelectorConfig(multiline=True))
-        if data.get(CONF_TTS_MODEL):
-            tts_target = resolve_target(entry, "tts")
-            voices = await _async_voice_options(self.hass, tts_target)
-            schema[
-                vol.Optional(
-                    CONF_TTS_VOICE,
-                    default=(data.get(CONF_TTS_VOICE) or _default_voice(
-                        tts_target["kind"], tts_target["model"]
-                    )),
-                )
-            ] = SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        {"value": value, "label": label}
-                        for value, label in voices.items()
-                    ],
-                    custom_value=True,
-                    sort=False,
-                )
-            )
-        schema[vol.Optional("configure_advanced", default=False)] = BooleanSelector()
         return self.async_show_form(
-            step_id="init", data_schema=vol.Schema(schema), errors=errors
+            step_id="models", data_schema=vol.Schema(schema), errors=errors
         )
 
-    # ------------------------------------------------------------ advanced
+    async def _apply_models(
+        self, buckets_list: list[dict[str, list[str]]]
+    ) -> ConfigFlowResult:
+        """Save the selected models against their providers."""
+        new_data = dict(self._entry_data)
+        for cap, info in CAPABILITIES.items():
+            raw = (self._collected.get(info["key"]) or "").strip()
+            model = ""
+            src_index = 0
+            if raw and raw not in (NONE_OPTION, OTHER_OPTION):
+                model = raw
+                for index, buckets in enumerate(buckets_list or []):
+                    if model in buckets.get(info["bucket"], []):
+                        src_index = index
+                        break
+            new_data[info["key"]] = model
+            new_data[info["src"]] = (
+                SRC_MAIN if src_index == 0 else f"p{src_index - 1}"
+            )
+        self._update_entry(new_data)
+        return await self.async_step_init()
+
+    # ------------------------------------------------------------ 提示词
+    async def async_step_prompt(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit the conversation prompt."""
+        data = self._entry_data
+        if user_input is not None:
+            new_data = dict(data)
+            new_data[CONF_PROMPT] = (
+                user_input.get(CONF_PROMPT) or ""
+            ).strip() or DEFAULT_PROMPT
+            self._update_entry(new_data)
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id="prompt",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_PROMPT, default=data.get(CONF_PROMPT) or DEFAULT_PROMPT
+                    ): TextSelector(TextSelectorConfig(multiline=True))
+                }
+            ),
+        )
+
+    # ------------------------------------------------------------ 音色
+    async def async_step_voice(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit the TTS voice of the configured TTS entity."""
+        data = self._entry_data
+        target = resolve_target(self.config_entry, "tts")
+        if user_input is not None:
+            new_data = dict(data)
+            new_data[CONF_TTS_VOICE] = (
+                user_input.get(CONF_TTS_VOICE) or ""
+            ).strip()
+            self._update_entry(new_data)
+            return await self.async_step_init()
+
+        voices = await _async_voice_options(self.hass, target)
+        return self.async_show_form(
+            step_id="voice",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_TTS_VOICE,
+                        default=data.get(CONF_TTS_VOICE)
+                        or _default_voice(target["kind"], target["model"]),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                {"value": value, "label": label}
+                                for value, label in voices.items()
+                            ],
+                            custom_value=True,
+                            sort=False,
+                        )
+                    )
+                }
+            ),
+            description_placeholders={
+                "provider": target.get("name") or "",
+                "model": target.get("model") or "",
+            },
+        )
+
+    # ------------------------------------------------------------ 高级
     def _advanced_schema(self, data: dict[str, Any]) -> vol.Schema:
         """Build the advanced-parameters form."""
         def number(key: str, default: float, low: float, high: float, step: float):
@@ -825,7 +924,7 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
                 )
             )
 
-        def select(options: dict[str, str], key: str, default: str):
+        def select(options: dict[str, str]):
             return SelectSelector(
                 SelectSelectorConfig(
                     options=[
@@ -859,7 +958,10 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             vol.Optional(
                 CONF_TASK_TEMPERATURE,
                 default=float(
-                    data.get(CONF_TASK_TEMPERATURE, data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE))
+                    data.get(
+                        CONF_TASK_TEMPERATURE,
+                        data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+                    )
                 ),
             ): number(CONF_TASK_TEMPERATURE, DEFAULT_TEMPERATURE, 0, 2, 0.05),
             vol.Optional(
@@ -900,13 +1002,13 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             vol.Optional(
                 CONF_CONTEXT_ROLE,
                 default=data.get(CONF_CONTEXT_ROLE, DEFAULT_CONTEXT_ROLE),
-            ): select(CONTEXT_ROLES, CONF_CONTEXT_ROLE, DEFAULT_CONTEXT_ROLE),
+            ): select(CONTEXT_ROLES),
             vol.Optional(
                 CONF_THINKING_MODE, default=data.get(CONF_THINKING_MODE, "none")
-            ): select(THINKING_MODES, CONF_THINKING_MODE, "none"),
+            ): select(THINKING_MODES),
             vol.Optional(
                 CONF_REASONING_EFFORT, default=data.get(CONF_REASONING_EFFORT, "high")
-            ): select(REASONING_EFFORTS, CONF_REASONING_EFFORT, "high"),
+            ): select(REASONING_EFFORTS),
             vol.Optional(
                 CONF_THINKING_TOKEN_BUDGET,
                 default=str(data.get(CONF_THINKING_TOKEN_BUDGET, "")),
@@ -958,7 +1060,7 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Edit advanced generation parameters."""
-        data = dict(self.config_entry.data)
+        data = self._entry_data
         errors: dict[str, str] = {}
         if user_input is not None:
             for key in (
@@ -972,7 +1074,6 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
                 try:
                     json.loads(raw)
                 except ValueError:
-                    # 允许 k=v 行格式
                     if all(
                         "=" in line
                         for line in raw.splitlines()
@@ -982,16 +1083,17 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
                     errors["base"] = "invalid_json"
                     break
             if not errors:
-                self._advanced_values = dict(user_input)
-                if self._need:
-                    return await self.async_step_add_provider()
-                return self._async_save(self._buckets_list)
+                new_data = dict(data)
+                new_data.update(user_input)
+                self._update_entry(new_data)
+                return await self.async_step_init()
         return self.async_show_form(
             step_id="advanced",
             data_schema=self._advanced_schema(data),
             errors=errors,
         )
 
+    # ------------------------------------------------------------ 追加提供商
     async def async_step_add_provider(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -1008,7 +1110,9 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             if not base_url:
                 errors["base"] = "need_base_url"
             else:
-                kind = _kind_of(provider_url, base_url, user_input.get(CONF_PROTOCOL, "auto"))
+                kind = _kind_of(
+                    provider_url, base_url, user_input.get(CONF_PROTOCOL, "auto")
+                )
                 try:
                     models = await _fetch_models(
                         self.hass, base_url, user_input[CONF_API_KEY], kind
@@ -1063,7 +1167,6 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Pick models for the selected capabilities from the new provider."""
-        entry = self.config_entry
         if user_input is not None:
             for cap in self._need:
                 model = (user_input.get(cap) or "").strip()
@@ -1072,7 +1175,8 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
                 if model:
                     self._collected[CAPABILITIES[cap]["key"]] = model
                     self._collected[f"{cap}__new"] = "1"
-            return self._async_save_with_new_provider(buckets_list=None)
+            self._save_with_new_provider()
+            return await self.async_step_init()
 
         schema: dict[Any, Any] = {}
         for cap in self._need:
@@ -1081,7 +1185,10 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             if options:
                 schema[vol.Optional(cap, default=options[0])] = SelectSelector(
                     SelectSelectorConfig(
-                        options=[{"value": m, "label": f"{self._new_provider['name']} · {m}"} for m in sorted(options)]
+                        options=[
+                            {"value": model, "label": f"{self._new_provider['name']} · {model}"}
+                            for model in sorted(options)
+                        ]
                     )
                 )
             else:
@@ -1100,42 +1207,9 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             },
         )
 
-    def _async_save(self, buckets_list: list[dict[str, list[str]]]) -> ConfigFlowResult:
-        """Save collected selections against the existing providers."""
-        entry = self.config_entry
-        data = dict(entry.data)
-        providers = list(get_providers(entry).values())
-        new_data = dict(data)
-        for cap, info in CAPABILITIES.items():
-            raw = (self._collected.get(info["key"]) or "").strip()
-            model = ""
-            src_index = 0
-            if raw and raw not in (NONE_OPTION, OTHER_OPTION):
-                model = raw
-                for index, buckets in enumerate(buckets_list or []):
-                    if model in buckets.get(info["bucket"], []):
-                        src_index = index
-                        break
-            new_data[info["key"]] = model
-            new_data[info["src"]] = SRC_MAIN if src_index == 0 else f"p{src_index - 1}"
-        new_data[CONF_PROMPT] = self._collected.get(CONF_PROMPT) or DEFAULT_PROMPT
-        if CONF_TTS_VOICE in self._collected:
-            new_data[CONF_TTS_VOICE] = (
-                self._collected.get(CONF_TTS_VOICE) or ""
-            ).strip()
-        new_data.update(self._advanced_values)
-        self.hass.config_entries.async_update_entry(
-            entry,
-            data=new_data,
-            title=data.get(CONF_NAME) or data.get(CONF_PROVIDER) or "灵犀语音",
-        )
-        self.hass.config_entries.async_schedule_reload(entry.entry_id)
-        return self.async_create_entry(title="", data={})
-
-    def _async_save_with_new_provider(self, buckets_list=None) -> ConfigFlowResult:
-        """Save selections, appending the newly added provider."""
-        entry = self.config_entry
-        data = dict(entry.data)
+    def _save_with_new_provider(self) -> None:
+        """Append the new provider and save the selected models."""
+        data = self._entry_data
         new_data = dict(data)
         try:
             extras = json.loads(data.get(CONF_PROVIDERS_EXTRA) or "[]")
@@ -1143,7 +1217,8 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             extras = []
         extras = extras if isinstance(extras, list) else []
         if self._new_provider and not any(
-            (p or {}).get("base_url") == self._new_provider["base_url"] for p in extras
+            (p or {}).get("base_url") == self._new_provider["base_url"]
+            for p in extras
         ):
             extras.append(self._new_provider)
         new_data[CONF_PROVIDERS_EXTRA] = json.dumps(extras, ensure_ascii=False)
@@ -1151,7 +1226,8 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
             (
                 i
                 for i, p in enumerate(extras)
-                if (p or {}).get("base_url") == (self._new_provider or {}).get("base_url")
+                if (p or {}).get("base_url")
+                == (self._new_provider or {}).get("base_url")
             ),
             len(extras) - 1,
         )
@@ -1163,21 +1239,10 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
                 model = raw
                 if self._collected.get(f"{cap}__new"):
                     src_index = new_index
-                # 其它类别：沿用原有提供商（这里简化取 main 或已有模型匹配）
                 elif raw not in self._new_buckets.get(info["bucket"], []):
                     src_index = 0
             new_data[info["key"]] = model
-            new_data[info["src"]] = SRC_MAIN if src_index == 0 else f"p{src_index - 1}"
-        new_data[CONF_PROMPT] = self._collected.get(CONF_PROMPT) or DEFAULT_PROMPT
-        if CONF_TTS_VOICE in self._collected:
-            new_data[CONF_TTS_VOICE] = (
-                self._collected.get(CONF_TTS_VOICE) or ""
-            ).strip()
-        new_data.update(self._advanced_values)
-        self.hass.config_entries.async_update_entry(
-            entry,
-            data=new_data,
-            title=data.get(CONF_NAME) or data.get(CONF_PROVIDER) or "灵犀语音",
-        )
-        self.hass.config_entries.async_schedule_reload(entry.entry_id)
-        return self.async_create_entry(title="", data={})
+            new_data[info["src"]] = (
+                SRC_MAIN if src_index == 0 else f"p{src_index - 1}"
+            )
+        self._update_entry(new_data)

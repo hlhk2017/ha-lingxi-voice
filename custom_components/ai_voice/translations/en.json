@@ -69,17 +69,14 @@
   "options": {
     "step": {
       "init": {
-        "title": "Edit model settings",
-        "description": "Each model can come from a different provider (dropdown labels are prefixed with the provider).",
-        "data": {
-          "llm_model": "Chat model",
-          "task_model": "AI task model (defaults to chat)",
-          "image_model": "Image generation model (optional)",
-          "stt_model": "Speech-to-text model (optional)",
-          "tts_model": "Text-to-speech model (optional)",
+        "title": "Lingxi Voice settings",
+        "description": "Choose a section; changes apply immediately after saving.",
+        "menu_options": {
+          "models": "Models",
           "prompt": "Prompt",
-          "configure_advanced": "Configure advanced parameters",
-          "tts_voice": "TTS voice (empty = provider default)"
+          "voice": "TTS voice",
+          "advanced": "Advanced",
+          "finish": "Save and exit"
         }
       },
       "add_provider": {
@@ -133,6 +130,31 @@
           "chat_template_args": "Chat template arguments (JSON)",
           "request_body_params": "Additional request body parameters (JSON)",
           "custom_headers": "Custom HTTP headers (JSON)"
+        }
+      },
+      "models": {
+        "title": "Models",
+        "description": "Each model can come from a different provider (prefix in the dropdown); use “other provider” to add one for a single model.",
+        "data": {
+          "llm_model": "Conversation model",
+          "task_model": "AI task model (defaults to conversation model)",
+          "image_model": "Image model (optional)",
+          "stt_model": "Speech-to-text model (optional)",
+          "tts_model": "Text-to-speech model (optional)"
+        }
+      },
+      "prompt": {
+        "title": "Prompt",
+        "description": "System prompt for the conversation agent.",
+        "data": {
+          "prompt": "Conversation prompt"
+        }
+      },
+      "voice": {
+        "title": "TTS voice",
+        "description": "Current TTS: {provider} · {model}. Voices come from the provider documentation; type a value if the list cannot be fetched.",
+        "data": {
+          "tts_voice": "TTS voice (empty = provider default)"
         }
       }
     },

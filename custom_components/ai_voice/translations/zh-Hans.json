@@ -69,17 +69,14 @@
   "options": {
     "step": {
       "init": {
-        "title": "修改模型设置",
-        "description": "每个模型都可以选择不同提供商的模型（下拉里带提供商名前缀）；修改后会自动重新加载。",
-        "data": {
-          "llm_model": "对话模型",
-          "task_model": "AI 任务模型（默认同对话模型）",
-          "image_model": "图片生成模型（可选）",
-          "stt_model": "语音转文本模型（可选）",
-          "tts_model": "文本转语音模型（可选）",
-          "prompt": "对话提示词",
-          "configure_advanced": "配置高级参数",
-          "tts_voice": "TTS 音色（留空使用服务商默认）"
+        "title": "灵犀语音设置",
+        "description": "选择要修改的设置项；每项保存后自动生效。",
+        "menu_options": {
+          "models": "模型设置",
+          "prompt": "提示词设置",
+          "voice": "音色设置",
+          "advanced": "高级设置",
+          "finish": "保存并退出"
         }
       },
       "add_provider": {
@@ -133,6 +130,31 @@
           "chat_template_args": "Chat Template 参数（JSON）",
           "request_body_params": "附加请求体参数（JSON）",
           "custom_headers": "自定义 HTTP 头（JSON）"
+        }
+      },
+      "models": {
+        "title": "模型设置",
+        "description": "每个模型都可以选择不同提供商的模型（下拉里带提供商名前缀）；「其它提供商」可为单个模型新增一家服务商。",
+        "data": {
+          "llm_model": "对话模型",
+          "task_model": "AI 任务模型（默认同对话模型）",
+          "image_model": "图片生成模型（可选）",
+          "stt_model": "语音转文本模型（可选）",
+          "tts_model": "文本转语音模型（可选）"
+        }
+      },
+      "prompt": {
+        "title": "提示词设置",
+        "description": "对话代理的系统提示词。",
+        "data": {
+          "prompt": "对话提示词"
+        }
+      },
+      "voice": {
+        "title": "音色设置",
+        "description": "当前 TTS：{provider} · {model}。音色来自服务商文档；列表拉取失败时可直接输入音色名。",
+        "data": {
+          "tts_voice": "TTS 音色（留空使用服务商默认）"
         }
       }
     },
