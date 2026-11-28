@@ -9,8 +9,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
 from .const import (
+    COSYVOICE_VOICES,
+    DEFAULT_OPENAI_VOICE,
     MIMO_ASR_MODEL,
+    MIMO_DEFAULT_VOICE,
     MIMO_TTS_MODELS,
+    MIMO_TTS_VOICES,
+    OPENAI_TTS_VOICES,
+    SILICONFLOW_TTS_VOICES,
     CONF_API_KEY,
     CONF_BASE_URL,
     CONF_DOUBAO_API_KEY,
@@ -186,6 +192,46 @@ def resolve_target(entry: ConfigEntry, capability: str) -> dict:
                 kind="mimo",
             )
     return result
+
+
+def tts_voice_presets(
+    base_url: str | None, kind: str | None, model: str | None
+) -> dict[str, str]:
+    """Voice presets based on provider kind / model (from vendor docs)."""
+    low_model = (model or "").lower()
+    if kind == "mimo":
+        return dict(MIMO_TTS_VOICES)
+    if "siliconflow" in (base_url or "").lower():
+        prefix = f"{model}:" if model else ""
+        return {
+            f"{prefix}{value}": label
+            for value, label in SILICONFLOW_TTS_VOICES.items()
+        }
+    if "cosyvoice" in low_model:
+        return dict(COSYVOICE_VOICES)
+    return dict(OPENAI_TTS_VOICES)
+
+
+def resolve_tts_voice(
+    base_url: str | None,
+    kind: str | None,
+    model: str | None,
+    configured: str | None,
+) -> str:
+    """Normalize the configured voice to what the provider expects."""
+    configured = (configured or "").strip()
+    if kind == "mimo":
+        return configured or MIMO_DEFAULT_VOICE
+    if "siliconflow" in (base_url or "").lower():
+        prefix = f"{model}:" if model else ""
+        if configured:
+            name = configured.split(":")[-1]
+            if name in SILICONFLOW_TTS_VOICES:
+                return f"{prefix}{name}"
+        return f"{prefix}alex"
+    if "cosyvoice" in (model or "").lower():
+        return configured or "中文女"
+    return configured or DEFAULT_OPENAI_VOICE
 
 
 def resolve_uid(entry: ConfigEntry) -> str:

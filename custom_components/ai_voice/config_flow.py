@@ -29,7 +29,12 @@ from homeassistant.helpers.selector import (
 )
 
 from . import protocols
-from .helpers import get_providers, resolve_target
+from .helpers import (
+    get_providers,
+    resolve_target,
+    resolve_tts_voice,
+    tts_voice_presets,
+)
 
 from .const import (
     CONF_API_KEY,
@@ -203,26 +208,6 @@ async def _fetch_models(hass, base_url: str, api_key: str, kind: str) -> list[st
     return [model.get("id") for model in data.get("data", []) if model.get("id")]
 
 
-def _voice_presets(kind: str, model: str) -> dict[str, str]:
-    """Built-in voice list based on provider kind / model (from vendor docs)."""
-    low = (model or "").lower()
-    if kind == "mimo":
-        return dict(MIMO_TTS_VOICES)
-    if "cosyvoice" in low:
-        return dict(COSYVOICE_VOICES)
-    return dict(OPENAI_TTS_VOICES)
-
-
-def _default_voice(kind: str, model: str) -> str:
-    """Default voice for a provider kind / model."""
-    low = (model or "").lower()
-    if kind == "mimo":
-        return MIMO_DEFAULT_VOICE
-    if "cosyvoice" in low:
-        return "中文女"
-    return DEFAULT_OPENAI_VOICE
-
-
 def _extract_voice_names(data) -> list[str]:
     """Extract voice names from a few common response shapes."""
     if isinstance(data, list):
@@ -279,7 +264,9 @@ async def _fetch_remote_voices(hass, target: dict) -> dict[str, str]:
 
 async def _async_voice_options(hass, target: dict) -> dict[str, str]:
     """Merge built-in voices with any voice list the provider exposes."""
-    voices = _voice_presets(target.get("kind") or "openai", target.get("model") or "")
+    voices = tts_voice_presets(
+        target.get("base_url"), target.get("kind"), target.get("model")
+    )
     remote = await _fetch_remote_voices(hass, target)
     voices.update(remote)
     return voices
@@ -894,8 +881,12 @@ class AIVoiceOptionsFlow(OptionsFlowWithReload):
                 {
                     vol.Optional(
                         CONF_TTS_VOICE,
-                        default=data.get(CONF_TTS_VOICE)
-                        or _default_voice(target["kind"], target["model"]),
+                        default=resolve_tts_voice(
+                            target.get("base_url"),
+                            target.get("kind"),
+                            target.get("model"),
+                            data.get(CONF_TTS_VOICE),
+                        ),
                     ): SelectSelector(
                         SelectSelectorConfig(
                             options=[

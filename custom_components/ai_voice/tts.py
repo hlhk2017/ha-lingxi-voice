@@ -16,7 +16,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .helpers import resolve_target
+from .helpers import resolve_target, resolve_tts_voice
 
 from .const import (
     CONF_API_KEY,
@@ -106,7 +106,12 @@ class AIVoiceTTSEntity(TextToSpeechEntity):
         if target["kind"] == "openai":
             return await self._async_openai_speech(target, message, options)
         opts = options or {}
-        voice = opts.get(CONF_TTS_VOICE) or self._current_voice
+        voice = resolve_tts_voice(
+            target.get("base_url"),
+            target.get("kind"),
+            self._current_model,
+            opts.get(CONF_TTS_VOICE) or self._current_voice,
+        )
         body = {
             "model": self._current_model,
             "messages": [{"role": "assistant", "content": message}],
@@ -151,7 +156,12 @@ class AIVoiceTTSEntity(TextToSpeechEntity):
         body = {
             "model": target["model"],
             "input": message,
-            "voice": opts.get(CONF_TTS_VOICE) or self._current_voice or "alloy",
+            "voice": resolve_tts_voice(
+                target.get("base_url"),
+                target.get("kind"),
+                target.get("model"),
+                opts.get(CONF_TTS_VOICE) or self._current_voice,
+            ),
             "response_format": "mp3",
         }
         session = async_get_clientsession(self.hass)

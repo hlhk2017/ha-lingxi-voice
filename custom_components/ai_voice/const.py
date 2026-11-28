@@ -77,6 +77,18 @@ OPENAI_TTS_VOICES: dict[str, str] = {
 }
 DEFAULT_OPENAI_VOICE = "alloy"
 
+# 硅基流动 TTS 预置音色（voice 需带模型前缀，如 FunAudioLLM/CosyVoice2-0.5B:alex）
+SILICONFLOW_TTS_VOICES: dict[str, str] = {
+    "alex": "Alex（沉稳男声）",
+    "anna": "Anna（沉稳女声）",
+    "bella": "Bella（激情女声）",
+    "benjamin": "Benjamin（男声）",
+    "charles": "Charles（男声）",
+    "claire": "Claire（温柔女声）",
+    "david": "David（男声）",
+    "diana": "Diana（欢快女声）",
+}
+
 # CosyVoice（硅基流动等）常用音色
 COSYVOICE_VOICES: dict[str, str] = {
     "中文女": "中文女",
